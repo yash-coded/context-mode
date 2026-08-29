@@ -24,7 +24,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/mksglu/context-mode"
+    "url": "https://github.com/yash-coded/context-mode"
   },
   "homepage": "https://github.com/mksglu/context-mode#readme",
   "pi": {
@@ -32,7 +32,7 @@
       "./build/adapters/pi/extension.js"
     ],
     "skills": [
-      "./skills"
+      "./skills/context-mode"
     ]
   },
   "openclaw": {

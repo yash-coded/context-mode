@@ -920,7 +920,7 @@ describe("Pi Extension", () => {
       expect(ctxResult.messages.length).toBe(1);
       expect(ctxResult.messages[0].role).toBe("user");
       expect(ctxResult.messages[0].content).toContain("context-mode active");
-      expect(ctxResult.messages[0].content).toContain("ctx_batch_execute > ctx_execute > ctx_execute_file");
+      expect(ctxResult.messages[0].content).toContain("batch commands with ctx_batch_execute");
     });
 
     it("re-injects the anchor via context hook on every subsequent call", async () => {

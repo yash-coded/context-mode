@@ -124,6 +124,49 @@ export interface MCPCallResult {
   isError?: boolean;
 }
 
+// Pi sends registered tool metadata on every model request. The upstream MCP
+// descriptions deliberately teach many clients the full workflow, but that
+// costs several thousand always-on tokens in Pi. Keep the MCP surface rich and
+// compact only the Pi bridge surface.
+const PI_TOOL_DESCRIPTIONS: Record<string, string> = {
+  ctx_execute: "Run code in a sandbox and return only printed output. Use to derive a small answer from potentially large command or generated output.",
+  ctx_execute_file: "Analyze a file in a sandbox through FILE_CONTENT; only printed output enters model context. Use normal read for files you will edit.",
+  ctx_index: "Index inline content or local files for later ctx_search queries.",
+  ctx_search: "Search indexed documentation and session memory. Batch related questions in queries.",
+  ctx_fetch_and_index: "Fetch URLs and index their readable content; query it later with ctx_search.",
+  ctx_batch_execute: "Run multiple commands, index their output, and optionally return matches for all queries in one call.",
+  ctx_stats: "Show context-mode token and tool-usage statistics.",
+  ctx_doctor: "Diagnose the context-mode installation.",
+  ctx_upgrade: "Return the command that upgrades context-mode.",
+  ctx_purge: "Permanently delete indexed content. Destructive; requires confirm=true and one scope.",
+  ctx_insight: "Open the context-mode Insight dashboard in a browser.",
+};
+
+/** Return a bounded Pi-specific description, including for future MCP tools. */
+export function compactPiToolDescription(tool: MCPTool): string {
+  const known = PI_TOOL_DESCRIPTIONS[tool.name];
+  if (known) return known;
+
+  const raw = (tool.description ?? "").replace(/\s+/g, " ").trim();
+  if (raw.length <= 240) return raw;
+  const sentenceEnd = raw.search(/[.!?](?:\s|$)/);
+  return raw.slice(0, sentenceEnd >= 0 && sentenceEnd < 240 ? sentenceEnd + 1 : 237).trimEnd() +
+    (sentenceEnd >= 0 && sentenceEnd < 240 ? "" : "...");
+}
+
+/** Remove prose-only JSON Schema annotations while preserving validation. */
+export function compactPiInputSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(compactPiInputSchema);
+  if (value === null || typeof value !== "object") return value;
+
+  const compact: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (key === "description" || key === "title" || key === "$comment" || key === "examples") continue;
+    compact[key] = compactPiInputSchema(child);
+  }
+  return compact;
+}
+
 // Bridge-imposed timeout for protocol-handshake methods (initialize,
 // tools/list). These MUST be bounded: a server that never replies to
 // initialize would otherwise block Pi's bridge bootstrap indefinitely.
@@ -1023,12 +1066,15 @@ export async function bootstrapMCPTools(
     pi.registerTool({
       name: tool.name,
       label: tool.name,
-      description: tool.description ?? "",
+      description: compactPiToolDescription(tool),
       // MCP tools/list returns JSON Schema; Pi validates against JSON
       // Schema (TypeBox is just JSON Schema with extra Symbol metadata
-      // for type inference). Empty-object fallback keeps tools that
-      // declare no parameters callable.
-      parameters: tool.inputSchema ?? { type: "object", properties: {} },
+      // for type inference). Strip prose-only annotations for Pi's recurring
+      // prompt budget while preserving the complete validation shape.
+      // Empty-object fallback keeps tools with no parameters callable.
+      parameters: compactPiInputSchema(
+        tool.inputSchema ?? { type: "object", properties: {} },
+      ) as Record<string, unknown>,
       renderCall: createContextModeCallRenderer(tool.name),
       renderResult: createContextModeResultRenderer(tool.name),
       async execute(_toolCallId, params) {

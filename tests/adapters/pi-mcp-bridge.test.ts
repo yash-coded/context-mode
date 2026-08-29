@@ -31,6 +31,39 @@ import { join } from "node:path";
 
 let scratch: string;
 
+describe("Pi prompt metadata compaction", () => {
+  it("uses concise descriptions and bounds unknown tools", async () => {
+    const { compactPiToolDescription } = await import("../../src/adapters/pi/mcp-bridge.js");
+
+    expect(compactPiToolDescription({ name: "ctx_execute", description: "very long upstream docs" }))
+      .toContain("sandbox");
+    expect(compactPiToolDescription({ name: "ctx_future", description: "x".repeat(500) }))
+      .toHaveLength(240);
+  });
+
+  it("removes prose annotations without changing validation keywords", async () => {
+    const { compactPiInputSchema } = await import("../../src/adapters/pi/mcp-bridge.js");
+    const schema = compactPiInputSchema({
+      type: "object",
+      description: "long docs",
+      required: ["confirm"],
+      properties: {
+        confirm: { type: "boolean", description: "must be true", default: false },
+        scope: { type: "string", enum: ["session", "project"], examples: ["project"] },
+      },
+    });
+
+    expect(schema).toEqual({
+      type: "object",
+      required: ["confirm"],
+      properties: {
+        confirm: { type: "boolean", default: false },
+        scope: { type: "string", enum: ["session", "project"] },
+      },
+    });
+  });
+});
+
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "ctx-pi-forkbomb-"));
 });

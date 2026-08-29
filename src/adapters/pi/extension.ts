@@ -650,16 +650,11 @@ export default function piExtension(pi: any): void {
       const parts: string[] = [];
       if (existingPrompt) parts.push(existingPrompt);
 
-      // Pi-1: Lightweight routing anchor — 7KB routing block is too heavy
-      // for Pi's context budget. Tool descriptions from pi.registerTool()
-      // already tell the model what each tool does. This anchor gives the
-      // deliberate choice (which tool for which scenario) without the full
-      // block/redirect/memory/tool-selection hierarchy.
+      // Pi-1: Tiny routing anchor. Concise Pi-specific tool descriptions carry
+      // selection cues without spending thousands of recurring prompt tokens.
       parts.push(
-        "context-mode active. Hierarchy: ctx_batch_execute > ctx_execute > ctx_execute_file > ctx_search. " +
-        "Read/edit files → ctx_execute_file. Multi-command research → ctx_batch_execute. " +
-        "Web pages → ctx_fetch_and_index then ctx_search. Index docs → ctx_index. " +
-        "Stats → ctx_stats. Doctor → ctx_doctor. Upgrade → ctx_upgrade. Purge → ctx_purge."
+        "context-mode active: derive small outputs with ctx_execute/ctx_execute_file; " +
+        "batch commands with ctx_batch_execute; fetch/index then ctx_search for docs."
       );
 
       // Pi-3 + Pi-4: Always build active_memory (not just post-compact),
